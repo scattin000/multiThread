@@ -1,5 +1,6 @@
 package com.example.sarah.multithread;
 
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -16,14 +17,25 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Handler;
 
 public class MainActivity extends AppCompatActivity {
     private ListView lv;
+    String MY_FILE_NAME;
+
     Button createButton;
     Button loadButton;
     Button clearButton;
+    Button progressBtn;
+    ProgressDialog progressBar;
+    private int progressBarStat = 0;
+    private Handler progressBarHandler = new Handler();
+
     List<String> total;
-    Thread thread;
+    Thread thread1;
+    Thread thread2;
+
+    public int filesize = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,13 +58,58 @@ public class MainActivity extends AppCompatActivity {
         // deal with clicks here NOT xmL
         createButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(final View v) {
+
+                // progress bar dialog set up
+                progressBar = new ProgressDialog(v.getContext());
+                progressBar.setCancelable(true);
+                progressBar.setMessage("File Currently Loading.");
+                progressBar.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+                progressBar.setProgress(0);
+                progressBar.setMax(100);
+                progressBar.show();
+
+                // reset the status
+                progressBarStat = 0;
+                // reset the file
+                filesize = 0;
+
                 // set up a background thread to manipulate the GUI
-                thread = new Thread(new Runnable() {
+                thread1 = new Thread(new Runnable() {
                     public void run() {
-                        createFile(v);
+                        while (progressBarStat < 100) {
+                            // process the tasks
+                            progressBarStat = createFile(v);
+
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+
+                            progressBarHandler.post(new Runnable() {
+                                public void run() {
+                                    progressBar.setProgress(progressBarStat);
+                                } // end run
+                            });
+                        } // end while
+                        if (progressBarStat >= 100) {
+                            try {
+                                Thread.sleep(2000);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                            // no more progress bar dialog!
+                            progressBar.dismiss();
+                        } // end if
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                arrayAdapter.notifyDataSetChanged();
+                            }
+                        });
                     } // end run
                 });
-                thread.start();
+                thread1.start();
                 Toast.makeText(getBaseContext(), "File saved successfully!", Toast.LENGTH_SHORT).show();
             }
         });
@@ -61,13 +118,53 @@ public class MainActivity extends AppCompatActivity {
         loadButton.setOnClickListener(new View.OnClickListener() {
         // used final to access View
             public void onClick(final View v) {
-                     thread = new Thread (new Runnable() {
+
+                progressBar = new ProgressDialog(v.getContext());
+                progressBar.setCancelable(true);
+                progressBar.setMessage("File currently downloading.");
+                progressBar.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+                progressBar.setProgress(0);
+                progressBar.setMax(100);
+                progressBar.show();
+
+                // reset again
+                progressBarStat = 0;
+                filesize = 0;
+
+                     thread2 = new Thread (new Runnable() {
                         public void run () {
-                            ReadBtn(v);
+                            while (progressBarStat < 100) {
+                                progressBarStat =  ReadBtn(v);
+                                try {
+                                    Thread.sleep(1000);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                                progressBarHandler.post(new Runnable() {
+                                    public void run() {
+                                        progressBar.setProgress(progressBarStat);
+                                    }
+                                });
+                            }// end while
+
+                            if (progressBarStat >= 100) {
+                                try {
+                                    Thread.sleep(2000);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+
+                                progressBar.dismiss();
+                            } // end if
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    arrayAdapter.notifyDataSetChanged();
+                                }
+                            });
                         }// end of run
                      }); // end thread
-                     thread.start();
-                    arrayAdapter.notifyDataSetChanged();
+                     thread2.start();
                 }// end onClick
             });
 
@@ -84,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    public void createFile(View v) {
+    public int createFile(View v) {
         // create file in internal storage area
         String MY_FILE_NAME = "numbers.txt";
         // change this content to be the numbers from the counting class in the group assignment
@@ -105,6 +202,8 @@ public class MainActivity extends AppCompatActivity {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
+                progressBar.setProgress(filesize*10);
+                filesize++;
             }
             // close the file
             fileos.close();
@@ -113,14 +212,16 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return 100;
     }// end createFile
 
     // Read text from file
-    public void ReadBtn(View v) {
+    public int ReadBtn(View v) {
+        String total;
         //reading text from file
         try {
             // open the file
-            FileInputStream fileIn = openFileInput("numbers.txt");
+            FileInputStream fileIn = openFileInput(MY_FILE_NAME);
             InputStreamReader InputRead= new InputStreamReader(fileIn);
             BufferedReader bufferedReader = new BufferedReader(InputRead);
 
@@ -128,14 +229,18 @@ public class MainActivity extends AppCompatActivity {
             // setting the line
             while ((line = bufferedReader.readLine()) !=null) {
                 total.add(line);
+                System.out.println(filesize);
                 Thread.sleep(250);
             }
+            progressBar.setProgress(filesize*10);
+            filesize++;
             // always need to close the read
             InputRead.close();
 
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return 100;
     }// end ReadBtn
 } // end of class
     //
